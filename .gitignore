@@ -1,0 +1,70 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# Database
+chroma_db/
+*.sqlite3
+*.db
+
+# Documents
+docs/*.pdf
+docs/*.txt
+!docs/.gitkeep
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build
+dist/
+build/
+*.local
+
+# Markdown (excluding README)
+*.md
+!README.md
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Test files
+test_*.py
+*_test.py
