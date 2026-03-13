@@ -75,7 +75,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
     
     # Save file to docs folder
-    docs_path = Path("./docs")
+    docs_path = Path("../docs")
     docs_path.mkdir(exist_ok=True)
     
     file_path = docs_path / file.filename

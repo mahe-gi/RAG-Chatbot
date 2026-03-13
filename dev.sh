@@ -10,7 +10,30 @@ echo ""
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# Function to log with timestamp
+log() {
+    echo -e "${CYAN}[$(date +'%H:%M:%S')]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[$(date +'%H:%M:%S')] ✓${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[$(date +'%H:%M:%S')] ✗${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[$(date +'%H:%M:%S')] ⚠${NC} $1"
+}
+
+log_info() {
+    echo -e "${BLUE}[$(date +'%H:%M:%S')] ℹ${NC} $1"
+}
 
 # Function to check if a port is in use
 check_port() {
@@ -20,18 +43,20 @@ check_port() {
 # Function to kill process on port
 kill_port() {
     if check_port $1; then
-        echo -e "${YELLOW}Killing process on port $1...${NC}"
+        log_warning "Killing existing process on port $1..."
         lsof -ti:$1 | xargs kill -9 2>/dev/null || true
         sleep 1
+        log_success "Port $1 cleared"
     fi
 }
 
 # Cleanup function
 cleanup() {
     echo ""
-    echo -e "${YELLOW}Shutting down services...${NC}"
+    log_warning "Shutting down services..."
     kill_port 8000   # Backend
     kill_port 5173   # Frontend
+    log_success "All services stopped"
     exit 0
 }
 
@@ -39,55 +64,69 @@ cleanup() {
 trap cleanup INT TERM
 
 # Step 1: Check if Ollama is running
-echo "Step 1: Checking Ollama..."
+log "Step 1/6: Checking Ollama..."
 if ! check_port 11434; then
-    echo -e "${RED}Error: Ollama is not running${NC}"
+    log_error "Ollama is not running on port 11434"
     echo ""
     echo "Please start Ollama in a separate terminal:"
+    echo -e "${YELLOW}  cd local_model && ./start_ollama.sh${NC}"
+    echo "or"
     echo -e "${YELLOW}  ollama serve${NC}"
     echo ""
     exit 1
 fi
-echo -e "${GREEN}✓ Ollama is running on port 11434${NC}"
+log_success "Ollama is running on port 11434"
 
 # Check for phi model
+log "Checking for phi model..."
 if ! ollama list | grep -q "phi"; then
-    echo -e "${YELLOW}Warning: phi model not found${NC}"
-    echo "Run: ollama pull phi"
+    log_error "phi model not found"
+    log_info "Run: ollama pull phi"
     exit 1
 fi
-echo -e "${GREEN}✓ Phi model ready${NC}"
+log_success "Phi model is available"
 echo ""
 
 # Step 2: Setup Python environment
-echo "Step 2: Setting up Python environment..."
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
-fi
-source venv/bin/activate
-echo -e "${GREEN}✓ Virtual environment activated${NC}"
+log "Step 2/6: Setting up Python environment..."
+cd backend
 
-# Install Python dependencies
-echo "Installing Python dependencies..."
+if [ ! -d "venv" ]; then
+    log "Creating virtual environment..."
+    python3 -m venv venv
+    log_success "Virtual environment created"
+fi
+
+log "Activating virtual environment..."
+source venv/bin/activate
+log_success "Virtual environment activated"
+
+log "Checking Python dependencies..."
 pip3 install -q --upgrade pip
 pip3 install -q -r requirements.txt
-echo -e "${GREEN}✓ Python dependencies installed${NC}"
+log_success "Python dependencies installed"
 echo ""
 
 # Step 3: Create .env if needed
+log "Step 3/6: Checking configuration..."
 if [ ! -f .env ]; then
-    echo "Creating .env file..."
+    log "Creating .env file from template..."
     cp .env.example .env
-    echo -e "${YELLOW}⚠ Please edit .env and add your configuration${NC}"
+    log_warning "Please edit backend/.env and add your configuration"
 fi
+log_success "Configuration file exists"
 
 # Create docs directory
-mkdir -p docs
+cd ..
+if [ ! -d "docs" ]; then
+    log "Creating docs directory..."
+    mkdir -p docs
+    log_success "docs/ directory created"
+fi
 
 # Create sample document if docs is empty
 if [ ! "$(ls -A docs)" ]; then
-    echo "Creating sample document..."
+    log "Creating sample document..."
     cat > docs/sample.txt << 'EOF'
 Retrieval-Augmented Generation (RAG)
 
@@ -108,81 +147,126 @@ Benefits of RAG:
 - No need to fine-tune or retrain the LLM
 - Easy to update knowledge by adding new documents
 EOF
+    log_success "Sample document created"
 fi
+echo ""
 
 # Step 4: Ingest documents
-echo "Step 3: Ingesting documents..."
-python3 ingest_fast.py
+log "Step 4/6: Ingesting documents..."
+log_info "This may take a few minutes for large PDFs..."
+cd backend
+python3 ingest_fast.py 2>&1 | while IFS= read -r line; do
+    if [[ $line == *"✅"* ]]; then
+        log_success "$line"
+    elif [[ $line == *"❌"* ]]; then
+        log_error "$line"
+    elif [[ $line == *"📄"* ]] || [[ $line == *"📊"* ]] || [[ $line == *"✂️"* ]] || [[ $line == *"🔢"* ]] || [[ $line == *"💾"* ]]; then
+        log_info "$line"
+    elif [[ $line == *"Error"* ]] || [[ $line == *"error"* ]]; then
+        log_error "$line"
+    elif [[ $line == *"Warning"* ]] || [[ $line == *"warning"* ]]; then
+        log_warning "$line"
+    else
+        echo "$line"
+    fi
+done
+log_success "Document ingestion complete"
+cd ..
 echo ""
 
 # Step 5: Start Backend
-echo "Step 4: Starting Backend API..."
+log "Step 5/6: Starting Backend API..."
 kill_port 8000
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
+log "Launching uvicorn server..."
+cd backend
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
 BACKEND_PID=$!
-sleep 3
+cd ..
+log_info "Backend PID: $BACKEND_PID"
 
-# Check if backend started
+log "Waiting for backend to start..."
+for i in {1..10}; do
+    if check_port 8000; then
+        log_success "Backend is running on port 8000"
+        break
+    fi
+    sleep 1
+    echo -n "."
+done
+
 if ! check_port 8000; then
-    echo -e "${RED}Error: Failed to start backend${NC}"
-    echo "Check backend.log for details"
+    log_error "Failed to start backend"
+    log_info "Check backend.log for details: tail -f backend.log"
     exit 1
 fi
-echo -e "${GREEN}✓ Backend running on port 8000${NC}"
 echo ""
 
 # Step 6: Setup Frontend
-echo "Step 5: Setting up Frontend..."
+log "Step 6/6: Starting Frontend..."
 cd frontend
 
 # Install frontend dependencies if needed
 if [ ! -d "node_modules" ]; then
-    echo "Installing frontend dependencies..."
-    npm install
+    log "Installing frontend dependencies..."
+    npm install 2>&1 | while IFS= read -r line; do
+        if [[ $line == *"added"* ]] || [[ $line == *"packages"* ]]; then
+            log_info "$line"
+        fi
+    done
+    log_success "Frontend dependencies installed"
 fi
 
-# Step 7: Start Frontend
-echo "Step 6: Starting Frontend..."
+log "Launching Vite dev server..."
 kill_port 5173
 npm run dev > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
+log_info "Frontend PID: $FRONTEND_PID"
 cd ..
-sleep 5
 
-# Check if frontend started
+log "Waiting for frontend to start..."
+for i in {1..15}; do
+    if check_port 5173; then
+        log_success "Frontend is running on port 5173"
+        break
+    fi
+    sleep 1
+    echo -n "."
+done
+
 if ! check_port 5173; then
-    echo -e "${RED}Error: Failed to start frontend${NC}"
-    echo "Check frontend.log for details"
+    log_error "Failed to start frontend"
+    log_info "Check frontend.log for details: tail -f frontend.log"
     exit 1
 fi
-echo -e "${GREEN}✓ Frontend running on port 5173${NC}"
 echo ""
 
 # Success message
 echo "=========================================="
-echo -e "${GREEN}✓ All services started successfully!${NC}"
+log_success "All services started successfully!"
 echo "=========================================="
 echo ""
-echo "Access your application:"
+echo -e "${CYAN}Access your application:${NC}"
 echo ""
-echo "  Frontend:  http://localhost:5173"
-echo "  Backend:   http://localhost:8000"
-echo "  API Docs:  http://localhost:8000/docs"
+echo -e "  ${GREEN}Frontend:${NC}  http://localhost:5173"
+echo -e "  ${GREEN}Backend:${NC}   http://localhost:8000"
+echo -e "  ${GREEN}API Docs:${NC}  http://localhost:8000/docs"
 echo ""
-echo "Login credentials:"
+echo -e "${CYAN}Login credentials:${NC}"
 echo "  demo@ragbot.ai / password"
 echo "  admin@ragbot.ai / admin123"
 echo ""
-echo "Services running:"
-echo "  - Backend API (port 8000)"
-echo "  - Frontend UI (port 5173)"
+echo -e "${CYAN}Services running:${NC}"
+echo "  - Backend API (port 8000) - PID: $BACKEND_PID"
+echo "  - Frontend UI (port 5173) - PID: $FRONTEND_PID"
 echo ""
-echo "Logs:"
+echo -e "${CYAN}View logs:${NC}"
 echo "  - Backend:  tail -f backend.log"
 echo "  - Frontend: tail -f frontend.log"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
 echo ""
 
-# Keep script running
-wait
+# Keep script running and show live logs
+log_info "Showing live backend logs (Ctrl+C to stop)..."
+echo ""
+tail -f backend.log

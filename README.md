@@ -1,67 +1,206 @@
 # RAG Chatbot v2.0
 
-AI-powered document assistant using Retrieval-Augmented Generation (RAG).
+A production-ready Retrieval-Augmented Generation (RAG) chatbot with FastAPI backend, React frontend, and local AI using Ollama.
+
+## Features
+
+- 🔐 JWT Authentication
+- 📄 Document Upload (PDF, TXT)
+- 🤖 Local AI with Ollama (no API costs)
+- 💬 Real-time Chat Interface
+- 🎨 Modern React UI with Tailwind CSS
+- 🔍 RAG-based Question Answering
+- 📊 ChromaDB Vector Storage
+
+## Project Structure
+
+```
+.
+├── backend/          # FastAPI backend
+│   ├── auth/         # Authentication module
+│   ├── chroma_db/    # Vector database
+│   ├── venv/         # Python virtual environment
+│   ├── main.py       # FastAPI app
+│   ├── ingest_fast.py
+│   ├── retriever_ollama.py
+│   └── requirements.txt
+├── frontend/         # React + Vite frontend
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Login.jsx
+│   │   │   └── Chat.jsx
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   └── package.json
+├── local_model/      # Ollama configuration
+│   └── start_ollama.sh
+├── docs/             # Documents for RAG
+└── dev.sh            # Development startup script
+```
 
 ## Quick Start
 
-### Windows
+### Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- Ollama
+
+### Installation
+
+1. Clone the repository:
 ```bash
-dev.bat
+git clone git@github.com:mahe-gi/RAG-Chatbot.git
+cd RAG-Chatbot
 ```
 
-### macOS/Linux
+2. Install Ollama:
 ```bash
-chmod +x dev.sh
+# macOS
+brew install ollama
+
+# Or download from https://ollama.ai
+```
+
+3. Pull the AI model:
+```bash
+ollama pull phi
+```
+
+### Running the Application
+
+**Terminal 1 - Start Ollama:**
+```bash
+cd local_model
+./start_ollama.sh
+```
+
+**Terminal 2 - Start Backend & Frontend:**
+```bash
 ./dev.sh
 ```
 
 The script will:
-1. Create a virtual environment
-2. Install dependencies
-3. Create `.env` from `.env.example`
-4. Ingest sample documents
-5. Start the server at http://localhost:8000
+- Check Ollama is running
+- Setup Python environment
+- Install dependencies
+- Ingest documents
+- Start backend (port 8000)
+- Start frontend (port 5173)
 
-## Setup
+### Access the Application
 
-1. Add your OpenAI API key to `.env`:
-```
-OPENAI_API_KEY=your_key_here
-```
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-2. Add documents to the `docs/` folder (PDF or TXT files)
+### Demo Accounts
 
-3. Run the ingest script:
-```bash
-python ingest.py
-```
+- demo@ragbot.ai / password
+- admin@ragbot.ai / admin123
 
-## Demo Accounts
+## Usage
 
-- `demo@ragbot.ai` / `password`
-- `admin@ragbot.ai` / `admin123`
+1. Login with demo credentials
+2. Upload documents (PDF or TXT)
+3. Click "Re-index Documents" to process them
+4. Ask questions about your documents
 
-## API Endpoints
+## Development
 
-- `POST /auth/login` - Login
-- `POST /auth/logout` - Logout
-- `GET /auth/me` - Get current user
-- `POST /chat` - Ask a question (requires auth)
-- `POST /ingest` - Ingest documents (requires auth)
-- `GET /health` - Health check
-
-API docs: http://localhost:8000/docs
-
-## CLI Mode
+### Backend Only
 
 ```bash
-python chat.py
+cd backend
+source venv/bin/activate
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Frontend Only
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Ollama Only
+
+```bash
+cd local_model
+./start_ollama.sh
 ```
 
 ## Tech Stack
 
-- FastAPI + Uvicorn
-- LangChain + OpenAI
+### Backend
+- FastAPI
 - ChromaDB
-- JWT authentication
-- Vanilla JS frontend
+- Ollama (phi model)
+- pdfplumber
+- LangChain
+- JWT Authentication
+
+### Frontend
+- React 19
+- Vite 8
+- Tailwind CSS 3.4
+- Axios
+
+### AI
+- Ollama (local)
+- phi model (1.6GB, fast)
+
+## Configuration
+
+Backend configuration is in `backend/.env`:
+
+```env
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+## Logs
+
+View real-time logs:
+
+```bash
+# Backend logs
+tail -f backend.log
+
+# Frontend logs
+tail -f frontend.log
+```
+
+## Troubleshooting
+
+### Ollama not running
+```bash
+cd local_model
+./start_ollama.sh
+```
+
+### Port already in use
+```bash
+# Kill process on port 8000
+lsof -ti:8000 | xargs kill -9
+
+# Kill process on port 5173
+lsof -ti:5173 | xargs kill -9
+```
+
+### Re-index documents
+```bash
+cd backend
+source venv/bin/activate
+python3 ingest_fast.py
+```
+
+## License
+
+MIT
+
+## Author
+
+Mahesh

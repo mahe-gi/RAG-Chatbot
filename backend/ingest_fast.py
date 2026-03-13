@@ -7,7 +7,7 @@ from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
 import pdfplumber
 
-DOCS_DIR = "./docs"
+DOCS_DIR = "../docs"
 CHROMA_DIR = "./chroma_db"
 
 def load_pdf_with_pdfplumber(file_path):

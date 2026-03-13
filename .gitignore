@@ -1,5 +1,5 @@
 # Python
-venv/
+backend/venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -13,11 +13,13 @@ build/
 .pytest_cache/
 
 # Environment
+backend/.env
+backend/.env.local
 .env
 .env.local
 
 # Database
-chroma_db/
+backend/chroma_db/
 *.sqlite3
 *.db
 
@@ -25,9 +27,12 @@ chroma_db/
 docs/*.pdf
 docs/*.txt
 !docs/.gitkeep
+!docs/README.md
 
 # Logs
 *.log
+backend.log
+frontend.log
 
 # OS
 .DS_Store
@@ -56,9 +61,13 @@ dist/
 build/
 *.local
 
-# Markdown (excluding README)
+# Markdown (excluding README files)
 *.md
 !README.md
+!backend/README.md
+!frontend/README.md
+!local_model/README.md
+!docs/README.md
 
 # Backup files
 *.backup
