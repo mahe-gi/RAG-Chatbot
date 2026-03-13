@@ -45,6 +45,7 @@ A production-ready Retrieval-Augmented Generation (RAG) chatbot with FastAPI bac
 - Python 3.9+
 - Node.js 18+
 - Ollama
+- Docker Desktop (for PostgreSQL)
 
 ### Installation
 
@@ -67,6 +68,17 @@ brew install ollama
 ollama pull phi
 ```
 
+4. Setup PostgreSQL database:
+```bash
+# Start PostgreSQL with Docker
+docker-compose up -d postgres
+
+# Setup database schema
+cd backend
+./setup_db.sh
+cd ..
+```
+
 ### Running the Application
 
 **Terminal 1 - Start Ollama:**
@@ -82,6 +94,7 @@ cd local_model
 
 The script will:
 - Check Ollama is running
+- Check PostgreSQL is running (starts if needed)
 - Setup Python environment
 - Install dependencies
 - Ingest documents
@@ -140,6 +153,8 @@ cd local_model
 - pdfplumber
 - LangChain
 - JWT Authentication
+- PostgreSQL + Prisma ORM
+- Docker
 
 ### Frontend
 - React 19
@@ -159,6 +174,14 @@ Backend configuration is in `backend/.env`:
 SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Database
+DATABASE_URL=postgresql://ragbot:ragbot123@localhost:5432/ragbot_db
+```
+
+Generate a secure SECRET_KEY:
+```bash
+openssl rand -hex 32
 ```
 
 ## Logs
@@ -174,6 +197,22 @@ tail -f frontend.log
 ```
 
 ## Troubleshooting
+
+### Database Issues
+```bash
+# Check PostgreSQL status
+docker ps | grep ragbot_postgres
+
+# View database logs
+docker logs ragbot_postgres
+
+# Restart database
+docker-compose restart postgres
+
+# Reset database
+cd backend
+prisma db push --force-reset
+```
 
 ### Ollama not running
 ```bash

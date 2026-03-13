@@ -23,6 +23,13 @@ backend/chroma_db/
 *.sqlite3
 *.db
 
+# Docker volumes
+postgres_data/
+
+# Prisma
+backend/prisma/migrations/
+.prisma/
+
 # Documents
 docs/*.pdf
 docs/*.txt

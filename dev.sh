@@ -64,7 +64,7 @@ cleanup() {
 trap cleanup INT TERM
 
 # Step 1: Check if Ollama is running
-log "Step 1/6: Checking Ollama..."
+log "Step 1/7: Checking Ollama..."
 if ! check_port 11434; then
     log_error "Ollama is not running on port 11434"
     echo ""
@@ -87,8 +87,25 @@ fi
 log_success "Phi model is available"
 echo ""
 
+# Step 1.5: Check if PostgreSQL is running
+log "Step 1.5/7: Checking PostgreSQL..."
+if ! check_port 5432; then
+    log_warning "PostgreSQL is not running"
+    log_info "Starting PostgreSQL with Docker..."
+    docker-compose up -d postgres
+    sleep 5
+    
+    if ! check_port 5432; then
+        log_error "Failed to start PostgreSQL"
+        log_info "Run: docker-compose up -d postgres"
+        exit 1
+    fi
+fi
+log_success "PostgreSQL is running on port 5432"
+echo ""
+
 # Step 2: Setup Python environment
-log "Step 2/6: Setting up Python environment..."
+log "Step 2/7: Setting up Python environment..."
 cd backend
 
 if [ ! -d "venv" ]; then
@@ -108,7 +125,7 @@ log_success "Python dependencies installed"
 echo ""
 
 # Step 3: Create .env if needed
-log "Step 3/6: Checking configuration..."
+log "Step 3/7: Checking configuration..."
 if [ ! -f .env ]; then
     log "Creating .env file from template..."
     cp .env.example .env
@@ -152,7 +169,7 @@ fi
 echo ""
 
 # Step 4: Ingest documents
-log "Step 4/6: Ingesting documents..."
+log "Step 4/7: Ingesting documents..."
 log_info "This may take a few minutes for large PDFs..."
 cd backend
 python3 ingest_fast.py 2>&1 | while IFS= read -r line; do
@@ -175,7 +192,7 @@ cd ..
 echo ""
 
 # Step 5: Start Backend
-log "Step 5/6: Starting Backend API..."
+log "Step 5/7: Starting Backend API..."
 kill_port 8000
 log "Launching uvicorn server..."
 cd backend
@@ -202,7 +219,7 @@ fi
 echo ""
 
 # Step 6: Setup Frontend
-log "Step 6/6: Starting Frontend..."
+log "Step 6/7: Starting Frontend..."
 cd frontend
 
 # Install frontend dependencies if needed

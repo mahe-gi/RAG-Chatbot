@@ -1,39 +1,57 @@
+"""Authentication routes"""
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from .auth import (
+    Token,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    create_user,
     authenticate_user,
     create_access_token,
     get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["authentication"])
 
-@router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+@router.post("/register", response_model=UserResponse)
+async def register(user_data: UserCreate):
+    """Register a new user"""
+    user = await create_user(user_data)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        isActive=user.isActive,
+        createdAt=user.createdAt
+    )
+
+@router.post("/login", response_model=Token)
+async def login(user_data: UserLogin):
+    """Login and get access token"""
+    user = await authenticate_user(user_data.email, user_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["email"]}, expires_delta=access_token_expires
+        data={"sub": user.email}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    return Token(access_token=access_token, token_type="bearer")
 
-@router.post("/logout")
-async def logout(current_user: dict = Depends(get_current_user)):
-    return {"message": f"User {current_user['email']} logged out successfully."}
-
-@router.get("/me")
-async def read_users_me(current_user: dict = Depends(get_current_user)):
-    return {
-        "email": current_user["email"],
-        "full_name": current_user["full_name"],
-        "role": current_user["role"],
-        "disabled": current_user["disabled"]
-    }
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user = Depends(get_current_user)):
+    """Get current user info"""
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        name=current_user.name,
+        isActive=current_user.isActive,
+        createdAt=current_user.createdAt
+    )
