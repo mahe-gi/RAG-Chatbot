@@ -120,16 +120,16 @@ fi
 
 source venv/bin/activate
 echo "  Installing Python dependencies..."
-pip3 install -q --upgrade pip
+python3 -m pip install -q --upgrade pip
 
 # Install base dependencies
-pip3 install -q fastapi uvicorn python-dotenv python-multipart python-jose[cryptography] passlib bcrypt
-pip3 install -q langchain langchain-community chromadb pdfplumber
+python3 -m pip install -q fastapi uvicorn python-dotenv python-multipart python-jose[cryptography] passlib bcrypt
+python3 -m pip install -q langchain langchain-community chromadb pdfplumber
 
 # Install database dependencies if needed
 if [ "$USE_DATABASE" = true ]; then
     echo "  Installing database dependencies..."
-    pip3 install -q prisma asyncpg
+    python3 -m pip install -q prisma asyncpg
 fi
 
 # Create .env file
@@ -152,12 +152,14 @@ fi
 if [ "$USE_DATABASE" = true ]; then
     echo "  Setting up database..."
     if [ -f "prisma/schema.prisma" ]; then
-        prisma generate > /dev/null 2>&1 || true
+        echo "  Generating Prisma client..."
+        PATH="$PWD/venv/bin:$PATH" python3 -m prisma generate > /dev/null 2>&1 || true
         
         if [ "$USE_DOCKER_DB" = true ]; then
             # Start Docker PostgreSQL
             cd ..
             if docker info > /dev/null 2>&1; then
+                echo "  Starting PostgreSQL..."
                 docker-compose up -d postgres > /dev/null 2>&1
                 sleep 5
             else
@@ -166,7 +168,8 @@ if [ "$USE_DATABASE" = true ]; then
             cd backend
         fi
         
-        prisma db push > /dev/null 2>&1 || true
+        echo "  Pushing database schema..."
+        PATH="$PWD/venv/bin:$PATH" python3 -m prisma db push > /dev/null 2>&1 || true
     fi
 fi
 
