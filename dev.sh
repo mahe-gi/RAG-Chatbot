@@ -165,16 +165,16 @@ source venv/bin/activate
 # Generate Prisma client if needed
 if [ -f "prisma/schema.prisma" ] && [ "$USE_DATABASE" = true ]; then
     echo "  Generating Prisma client..."
-    PATH="$PWD/venv/bin:$PATH" python3 -m prisma generate > /dev/null 2>&1 || true
+    PATH="$PWD/venv/bin:$PATH" venv/bin/python3 -m prisma generate > /dev/null 2>&1 || true
 fi
 
 # Ingest documents
 echo "  Ingesting documents..."
-python3 ingest_fast.py > /dev/null 2>&1 || true
+venv/bin/python3 ingest_fast.py > /dev/null 2>&1 || true
 
 # Start backend
 kill_port 8000
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
+venv/bin/python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
 BACKEND_PID=$!
 
 cd ..
