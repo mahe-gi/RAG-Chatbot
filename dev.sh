@@ -163,10 +163,7 @@ cd backend
 source venv/bin/activate
 
 # Generate Prisma client if needed
-if [ -f "prisma/schema.prisma" ] && [ "$USE_DATABASE" = true ]; then
-    echo "  Generating Prisma client..."
-    PATH="$PWD/venv/bin:$PATH" venv/bin/python3 -m prisma generate > /dev/null 2>&1 || true
-fi
+# Skipped - using SQLAlchemy instead
 
 # Ingest documents
 echo "  Ingesting documents..."

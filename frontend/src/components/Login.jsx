@@ -3,8 +3,10 @@ import { useState } from 'react'
 const API_BASE = 'http://localhost:8000'
 
 export default function Login({ onLogin }) {
+  const [isSignup, setIsSignup] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -14,20 +16,25 @@ export default function Login({ onLogin }) {
     setLoading(true)
 
     try {
-      const formData = new FormData()
-      formData.append('username', email)
-      formData.append('password', password)
+      const endpoint = isSignup ? '/auth/signup' : '/auth/login'
+      const body = isSignup 
+        ? { email, password, name: name || undefined }
+        : { email, password }
 
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
       })
 
       if (res.ok) {
         const data = await res.json()
         onLogin(data.access_token)
       } else {
-        setError('Invalid credentials. Please try again.')
+        const errorData = await res.json().catch(() => ({}))
+        setError(errorData.detail || (isSignup ? 'Signup failed. Please try again.' : 'Invalid credentials. Please try again.'))
       }
     } catch (error) {
       setError('Unable to connect to server.')
@@ -50,9 +57,35 @@ export default function Login({ onLogin }) {
           <p className="text-gray-600">Document Intelligence Assistant</p>
         </div>
 
-        {/* Login Card */}
+        {/* Login/Signup Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 animate-slide-up">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {isSignup ? 'Create Account' : 'Welcome Back'}
+            </h2>
+            <p className="text-gray-600 text-sm">
+              {isSignup ? 'Sign up to get started' : 'Sign in to continue'}
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5">
+            {isSignup && (
+              <div>
+                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Name (Optional)
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="input-field"
+                  placeholder="Enter your name"
+                  autoComplete="name"
+                />
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
                 Email Address
@@ -81,8 +114,12 @@ export default function Login({ onLogin }) {
                 className="input-field"
                 placeholder="Enter your password"
                 required
-                autoComplete="current-password"
+                autoComplete={isSignup ? "new-password" : "current-password"}
+                minLength={isSignup ? 6 : undefined}
               />
+              {isSignup && (
+                <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+              )}
             </div>
 
             {error && (
@@ -105,39 +142,30 @@ export default function Login({ onLogin }) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Signing in...
+                  {isSignup ? 'Creating account...' : 'Signing in...'}
                 </span>
               ) : (
-                'Sign In'
+                isSignup ? 'Create Account' : 'Sign In'
               )}
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 text-center">
-              Demo Credentials
+          {/* Toggle between login and signup */}
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+            <p className="text-sm text-gray-600">
+              {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignup(!isSignup)
+                  setError('')
+                  setName('')
+                }}
+                className="font-semibold text-primary-900 hover:text-primary-800 transition-colors"
+              >
+                {isSignup ? 'Sign In' : 'Sign Up'}
+              </button>
             </p>
-            <div className="space-y-2">
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">User Account</p>
-                    <p className="text-sm font-mono text-gray-900">demo@ragbot.ai</p>
-                  </div>
-                  <code className="text-xs bg-white px-2 py-1 rounded border border-gray-200 font-mono">password</code>
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Admin Account</p>
-                    <p className="text-sm font-mono text-gray-900">admin@ragbot.ai</p>
-                  </div>
-                  <code className="text-xs bg-white px-2 py-1 rounded border border-gray-200 font-mono">admin123</code>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

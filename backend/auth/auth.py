@@ -1,76 +1,47 @@
-"""Authentication logic with Prisma and PostgreSQL"""
+"""Authentication utilities"""
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 import os
-from dotenv import load_dotenv
+import uuid
 
-from .database import prisma
-
-load_dotenv()
+from .database import get_db, User, Session as DBSession
 
 # Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
-# Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Bearer token
 security = HTTPBearer()
 
-# Models
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    email: Optional[str] = None
-
-class UserCreate(BaseModel):
-    email: str
-    password: str
-    name: Optional[str] = None
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    name: Optional[str]
-    isActive: bool
-    createdAt: datetime
-
-# Password utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
+    """Verify password"""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """Hash a password"""
+    """Hash password"""
     return pwd_context.hash(password)
 
-# Token utilities
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token"""
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create JWT token"""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get current authenticated user from JWT token"""
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Get current authenticated user"""
+    token = credentials.credentials
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -78,82 +49,34 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     )
     
     try:
-        token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        user_id: str = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
-        token_data = TokenData(email=email)
     except JWTError:
         raise credentials_exception
     
-    user = await prisma.user.find_unique(where={"email": token_data.email})
+    if db is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not configured. Please set DATABASE_URL in .env"
+        )
+    
+    # Check database
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
     if user is None:
         raise credentials_exception
     
-    if not user.isActive:
+    if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     
     return user
 
-# User operations
-async def create_user(user_data: UserCreate):
-    """Create a new user"""
-    # Check if user exists
-    existing_user = await prisma.user.find_unique(where={"email": user_data.email})
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
+async def create_demo_user(db: AsyncSession):
+    """Initialize database - no demo users created"""
+    if db is None:
+        return
     
-    # Hash password
-    hashed_password = get_password_hash(user_data.password)
-    
-    # Create user
-    user = await prisma.user.create(
-        data={
-            "email": user_data.email,
-            "password": hashed_password,
-            "name": user_data.name,
-        }
-    )
-    
-    return user
-
-async def authenticate_user(email: str, password: str):
-    """Authenticate user with email and password"""
-    user = await prisma.user.find_unique(where={"email": email})
-    if not user:
-        return False
-    if not verify_password(password, user.password):
-        return False
-    return user
-
-async def create_demo_users():
-    """Create demo users if they don't exist"""
-    demo_users = [
-        {
-            "email": "demo@ragbot.ai",
-            "password": "password",
-            "name": "Demo User"
-        },
-        {
-            "email": "admin@ragbot.ai",
-            "password": "admin123",
-            "name": "Admin User"
-        }
-    ]
-    
-    for user_data in demo_users:
-        existing = await prisma.user.find_unique(where={"email": user_data["email"]})
-        if not existing:
-            hashed_password = get_password_hash(user_data["password"])
-            await prisma.user.create(
-                data={
-                    "email": user_data["email"],
-                    "password": hashed_password,
-                    "name": user_data["name"],
-                }
-            )
-            print(f"✓ Created demo user: {user_data['email']}")
+    print("✓ Database initialized - users can now sign up")

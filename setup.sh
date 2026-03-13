@@ -123,13 +123,13 @@ echo "  Installing Python dependencies..."
 venv/bin/python3 -m pip install -q --upgrade pip
 
 # Install base dependencies
-venv/bin/python3 -m pip install -q fastapi uvicorn python-dotenv python-multipart python-jose[cryptography] passlib bcrypt
+venv/bin/python3 -m pip install -q fastapi uvicorn python-dotenv python-multipart 'python-jose[cryptography]' passlib bcrypt email-validator
 venv/bin/python3 -m pip install -q langchain langchain-community chromadb pdfplumber
 
 # Install database dependencies if needed
 if [ "$USE_DATABASE" = true ]; then
     echo "  Installing database dependencies..."
-    venv/bin/python3 -m pip install -q prisma asyncpg
+    venv/bin/python3 -m pip install -q sqlalchemy asyncpg
 fi
 
 # Create .env file
@@ -148,28 +148,21 @@ if [ "$USE_DATABASE" = true ]; then
     echo "DATABASE_URL=$DATABASE_URL" >> .env
 fi
 
-# Setup database if using Prisma
+# Setup database if using SQLAlchemy
 if [ "$USE_DATABASE" = true ]; then
-    echo "  Setting up database..."
-    if [ -f "prisma/schema.prisma" ]; then
-        echo "  Generating Prisma client..."
-        PATH="$PWD/venv/bin:$PATH" venv/bin/python3 -m prisma generate > /dev/null 2>&1 || true
-        
-        if [ "$USE_DOCKER_DB" = true ]; then
-            # Start Docker PostgreSQL
-            cd ..
-            if docker info > /dev/null 2>&1; then
-                echo "  Starting PostgreSQL..."
-                docker-compose up -d postgres > /dev/null 2>&1
-                sleep 5
-            else
-                echo -e "${YELLOW}  Warning: Docker not running, skipping PostgreSQL start${NC}"
-            fi
-            cd backend
+    echo "  Database will be initialized on first run..."
+    
+    if [ "$USE_DOCKER_DB" = true ]; then
+        # Start Docker PostgreSQL
+        cd ..
+        if docker info > /dev/null 2>&1; then
+            echo "  Starting PostgreSQL..."
+            docker-compose up -d postgres > /dev/null 2>&1
+            sleep 5
+        else
+            echo -e "${YELLOW}  Warning: Docker not running, skipping PostgreSQL start${NC}"
         fi
-        
-        echo "  Pushing database schema..."
-        PATH="$PWD/venv/bin:$PATH" venv/bin/python3 -m prisma db push > /dev/null 2>&1 || true
+        cd backend
     fi
 fi
 

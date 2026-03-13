@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 import os
 
 from auth.routes import router as auth_router
-from auth.auth import get_current_user, create_demo_users
-from auth.database import connect_db, disconnect_db
+from auth.auth import get_current_user, create_demo_user
+from auth.database import init_db, engine, get_db
 from ingest_fast import ingest_documents
 from retriever_ollama import ask_question
 
@@ -20,13 +20,20 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     # Startup
     print("🚀 Starting RAG Chatbot API...")
-    await connect_db()
-    await create_demo_users()
-    print("✓ Demo users ready")
+    if engine:
+        await init_db()
+        # Create demo user
+        async for db in get_db():
+            await create_demo_user(db)
+            break
+        print("✓ Database ready with demo user")
+    else:
+        print("⚠ Running without database - using in-memory auth")
     yield
     # Shutdown
     print("👋 Shutting down...")
-    await disconnect_db()
+    if engine:
+        await engine.dispose()
 
 app = FastAPI(
     title="RAG Chatbot API",
@@ -115,7 +122,7 @@ async def read_root():
         "message": "RAG Chatbot API v2.0",
         "frontend": "http://localhost:5173",
         "docs": "http://localhost:8000/docs",
-        "database": "PostgreSQL with Prisma"
+        "database": "PostgreSQL with SQLAlchemy"
     }
 
 if __name__ == "__main__":
