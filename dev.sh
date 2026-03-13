@@ -2,7 +2,7 @@
 set -e
 
 echo "=========================================="
-echo "RAG Chatbot v2.0 - Complete Setup"
+echo "RAG Chatbot v2.0 - Development Server"
 echo "=========================================="
 echo ""
 
@@ -30,7 +30,6 @@ kill_port() {
 cleanup() {
     echo ""
     echo -e "${YELLOW}Shutting down services...${NC}"
-    kill_port 11434  # Ollama
     kill_port 8000   # Backend
     kill_port 5173   # Frontend
     exit 0
@@ -39,40 +38,29 @@ cleanup() {
 # Trap Ctrl+C
 trap cleanup INT TERM
 
-# Step 1: Check if Ollama is installed
+# Step 1: Check if Ollama is running
 echo "Step 1: Checking Ollama..."
-if ! command -v ollama &> /dev/null; then
-    echo -e "${RED}Error: Ollama is not installed${NC}"
-    echo "Install from: https://ollama.ai"
-    exit 1
-fi
-echo -e "${GREEN}✓ Ollama found${NC}"
-echo ""
-
-# Step 2: Start Ollama
-echo "Step 2: Starting Ollama..."
-kill_port 11434
-ollama serve > /dev/null 2>&1 &
-OLLAMA_PID=$!
-sleep 3
-
-# Check if Ollama started
 if ! check_port 11434; then
-    echo -e "${RED}Error: Failed to start Ollama${NC}"
+    echo -e "${RED}Error: Ollama is not running${NC}"
+    echo ""
+    echo "Please start Ollama in a separate terminal:"
+    echo -e "${YELLOW}  ollama serve${NC}"
+    echo ""
     exit 1
 fi
-echo -e "${GREEN}✓ Ollama running on port 11434${NC}"
+echo -e "${GREEN}✓ Ollama is running on port 11434${NC}"
 
 # Check for phi model
 if ! ollama list | grep -q "phi"; then
-    echo -e "${YELLOW}Pulling phi model...${NC}"
-    ollama pull phi
+    echo -e "${YELLOW}Warning: phi model not found${NC}"
+    echo "Run: ollama pull phi"
+    exit 1
 fi
 echo -e "${GREEN}✓ Phi model ready${NC}"
 echo ""
 
-# Step 3: Setup Python environment
-echo "Step 3: Setting up Python environment..."
+# Step 2: Setup Python environment
+echo "Step 2: Setting up Python environment..."
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
     python3 -m venv venv
@@ -87,7 +75,7 @@ pip3 install -q -r requirements.txt
 echo -e "${GREEN}✓ Python dependencies installed${NC}"
 echo ""
 
-# Step 4: Create .env if needed
+# Step 3: Create .env if needed
 if [ ! -f .env ]; then
     echo "Creating .env file..."
     cp .env.example .env
@@ -122,29 +110,29 @@ Benefits of RAG:
 EOF
 fi
 
-# Step 5: Ingest documents
-echo "Step 4: Ingesting documents..."
+# Step 4: Ingest documents
+echo "Step 3: Ingesting documents..."
 python3 ingest_fast.py
 echo ""
 
-# Step 6: Start Backend
-echo "Step 5: Starting Backend API..."
+# Step 5: Start Backend
+echo "Step 4: Starting Backend API..."
 kill_port 8000
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > /dev/null 2>&1 &
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
 BACKEND_PID=$!
 sleep 3
 
 # Check if backend started
 if ! check_port 8000; then
     echo -e "${RED}Error: Failed to start backend${NC}"
-    cleanup
+    echo "Check backend.log for details"
     exit 1
 fi
 echo -e "${GREEN}✓ Backend running on port 8000${NC}"
 echo ""
 
-# Step 7: Setup Frontend
-echo "Step 6: Setting up Frontend..."
+# Step 6: Setup Frontend
+echo "Step 5: Setting up Frontend..."
 cd frontend
 
 # Install frontend dependencies if needed
@@ -153,10 +141,10 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# Step 8: Start Frontend
-echo "Step 7: Starting Frontend..."
+# Step 7: Start Frontend
+echo "Step 6: Starting Frontend..."
 kill_port 5173
-npm run dev > /dev/null 2>&1 &
+npm run dev > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 sleep 5
@@ -164,7 +152,7 @@ sleep 5
 # Check if frontend started
 if ! check_port 5173; then
     echo -e "${RED}Error: Failed to start frontend${NC}"
-    cleanup
+    echo "Check frontend.log for details"
     exit 1
 fi
 echo -e "${GREEN}✓ Frontend running on port 5173${NC}"
@@ -186,9 +174,12 @@ echo "  demo@ragbot.ai / password"
 echo "  admin@ragbot.ai / admin123"
 echo ""
 echo "Services running:"
-echo "  - Ollama (port 11434)"
 echo "  - Backend API (port 8000)"
 echo "  - Frontend UI (port 5173)"
+echo ""
+echo "Logs:"
+echo "  - Backend:  tail -f backend.log"
+echo "  - Frontend: tail -f frontend.log"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
 echo ""
