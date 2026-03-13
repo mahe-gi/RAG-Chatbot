@@ -1,71 +1,49 @@
-# Quick Reference Card
+# Quick Reference
 
-## One-Time Setup
+## Setup & Start
 
 ```bash
-# 1. Install prerequisites
-# - Docker Desktop
-# - Ollama
-# - Node.js 18+
-# - Python 3.9+
+# First time setup (interactive)
+./setup.sh
 
-# 2. Run complete setup
-./setup_all.sh
-
-# This will:
-# - Start PostgreSQL
-# - Setup backend + database
-# - Setup frontend
-# - Pull Ollama model
-# - Ingest sample documents
-```
-
-## Daily Usage
-
-### Start Everything (2 Terminals)
-
-**Terminal 1 - Ollama:**
-```bash
-cd local_model
-./start_ollama.sh
-```
-
-**Terminal 2 - App:**
-```bash
+# Start all services
 ./dev.sh
+
+# Stop all services
+# Press Ctrl+C in the terminal running dev.sh
 ```
 
-### Access
+## Access URLs
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8000
 - API Docs: http://localhost:8000/docs
-- Database UI: `cd backend && prisma studio`
+- Database GUI: `cd backend && prisma studio`
 
-### Demo Login
+## Demo Login
 
-- Email: demo@ragbot.ai
-- Password: password
+- Email: `demo@ragbot.ai`
+- Password: `password`
 
 ## Common Commands
 
-### Database
+### Services
 
 ```bash
-# Start PostgreSQL
+# Start everything
+./dev.sh
+
+# Start Ollama only
+ollama serve
+
+# Start PostgreSQL only
 docker-compose up -d postgres
 
 # Stop PostgreSQL
 docker-compose stop postgres
 
-# View logs
-docker logs ragbot_postgres
-
-# Database GUI
-cd backend && prisma studio
-
-# Reset database
-cd backend && prisma db push --force-reset
+# View running containers
+docker ps
 ```
 
 ### Backend
@@ -80,11 +58,10 @@ python3 -m uvicorn main:app --reload
 # Ingest documents
 python3 ingest_fast.py
 
-# Generate Prisma client
-prisma generate
-
-# Push schema changes
-prisma db push
+# Database operations
+prisma generate      # Generate client
+prisma db push       # Push schema
+prisma studio        # Open GUI
 ```
 
 ### Frontend
@@ -102,7 +79,111 @@ npm run dev
 npm run build
 ```
 
-### Ollama
+### Logs
+
+```bash
+# View logs
+tail -f backend.log
+tail -f frontend.log
+tail -f ollama.log
+docker logs -f ragbot_postgres
+
+# Follow all logs
+tail -f backend.log frontend.log
+```
+
+### Ports
+
+```bash
+# Check if port is in use
+lsof -ti:8000    # Backend
+lsof -ti:5173    # Frontend
+lsof -ti:5432    # PostgreSQL
+lsof -ti:11434   # Ollama
+
+# Kill process on port
+lsof -ti:8000 | xargs kill -9
+```
+
+## API Examples
+
+### Authentication
+
+```bash
+# Register
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "password123",
+    "name": "John Doe"
+  }'
+
+# Login
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@ragbot.ai",
+    "password": "password"
+  }'
+
+# Get current user
+curl -X GET http://localhost:8000/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+### Chat
+
+```bash
+# Ask question
+curl -X POST http://localhost:8000/chat \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What is RAG?",
+    "session_id": "default"
+  }'
+```
+
+### Documents
+
+```bash
+# Upload document
+curl -X POST http://localhost:8000/upload \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@document.pdf"
+
+# Re-index documents
+curl -X POST http://localhost:8000/ingest \
+  -H "Authorization: Bearer <token>"
+```
+
+## Configuration
+
+### Environment Variables
+
+Edit `backend/.env`:
+
+```env
+# Required
+SECRET_KEY=<openssl rand -hex 32>
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Optional: OpenAI
+OPENAI_API_KEY=sk-...
+
+# Optional: Database
+DATABASE_URL=postgresql://user:pass@host:5432/db
+```
+
+### Generate Secret Key
+
+```bash
+openssl rand -hex 32
+```
+
+## Ollama Commands
 
 ```bash
 # Start server
@@ -113,100 +194,73 @@ ollama list
 
 # Pull model
 ollama pull phi
+ollama pull llama2
 
 # Remove model
 ollama rm phi
+
+# Test model
+curl http://localhost:11434/api/tags
 ```
 
-### Docker
+## Docker Commands
 
 ```bash
-# View running containers
-docker ps
+# Start PostgreSQL
+docker-compose up -d postgres
 
-# Stop all containers
-docker-compose down
+# Stop PostgreSQL
+docker-compose stop postgres
+
+# View logs
+docker logs ragbot_postgres
+docker logs -f ragbot_postgres  # Follow
+
+# Connect to database
+docker exec -it ragbot_postgres psql -U ragbot -d ragbot_db
 
 # Remove everything (including data)
 docker-compose down -v
-
-# View logs
-docker logs -f ragbot_postgres
 ```
 
-## Project Structure
+## Database Commands
 
-```
-.
-├── backend/              # FastAPI + Python
-│   ├── auth/             # Authentication
-│   ├── prisma/           # Database schema
-│   ├── main.py           # API server
-│   └── ingest_fast.py    # Document ingestion
-├── frontend/             # React + Vite
-│   └── src/components/   # UI components
-├── local_model/          # Ollama scripts
-├── docs/                 # Documents for RAG
-├── dev.sh                # Main startup script
-└── docker-compose.yml    # PostgreSQL config
-```
-
-## API Endpoints
-
-### Authentication
 ```bash
-# Register
-POST /auth/register
-Body: {"email": "user@example.com", "password": "pass", "name": "Name"}
+cd backend
+source venv/bin/activate
 
-# Login
-POST /auth/login
-Body: {"email": "user@example.com", "password": "pass"}
+# Generate Prisma client
+prisma generate
 
-# Get current user
-GET /auth/me
-Header: Authorization: Bearer <token>
-```
+# Push schema to database
+prisma db push
 
-### Chat
-```bash
-# Ask question
-POST /chat
-Header: Authorization: Bearer <token>
-Body: {"question": "What is RAG?", "session_id": "default"}
-```
+# Reset database (WARNING: deletes all data)
+prisma db push --force-reset
 
-### Documents
-```bash
-# Upload document
-POST /upload
-Header: Authorization: Bearer <token>
-Body: multipart/form-data with file
-
-# Re-index documents
-POST /ingest
-Header: Authorization: Bearer <token>
-```
-
-## Environment Variables
-
-`backend/.env`:
-```env
-SECRET_KEY=<generate with: openssl rand -hex 32>
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-DATABASE_URL=postgresql://ragbot:ragbot123@localhost:5432/ragbot_db
+# Open database GUI
+prisma studio
 ```
 
 ## Troubleshooting
 
-### Port already in use
+### Docker not running
+```bash
+# Start Docker Desktop app
+# Wait for whale icon in menu bar
+```
+
+### Port conflicts
 ```bash
 # Find and kill process
-lsof -ti:8000 | xargs kill -9   # Backend
-lsof -ti:5173 | xargs kill -9   # Frontend
-lsof -ti:5432 | xargs kill -9   # PostgreSQL
-lsof -ti:11434 | xargs kill -9  # Ollama
+lsof -ti:8000 | xargs kill -9
+```
+
+### Ollama not responding
+```bash
+# Restart Ollama
+pkill ollama
+ollama serve
 ```
 
 ### Database connection error
@@ -221,22 +275,46 @@ docker-compose restart postgres
 docker logs ragbot_postgres
 ```
 
-### Prisma errors
+### Frontend not loading
 ```bash
-cd backend
-source venv/bin/activate
-pip install --upgrade prisma
-prisma generate
+# Check logs
+tail -f frontend.log
+
+# Reinstall dependencies
+cd frontend
+rm -rf node_modules
+npm install
 ```
 
-### Ollama not responding
+### Backend errors
 ```bash
-# Check if running
-curl http://localhost:11434/api/tags
+# Check logs
+tail -f backend.log
 
-# Restart
-pkill ollama
-ollama serve
+# Reinstall dependencies
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Project Structure
+
+```
+.
+├── backend/              # FastAPI backend
+│   ├── auth/             # Authentication
+│   ├── prisma/           # Database schema
+│   ├── venv/             # Python environment
+│   ├── main.py           # API server
+│   └── .env              # Configuration
+├── frontend/             # React frontend
+│   ├── src/              # Source code
+│   └── node_modules/     # Dependencies
+├── local_model/          # Ollama scripts
+├── docs/                 # Documents for RAG
+├── setup.sh              # Interactive setup
+├── dev.sh                # Start all services
+└── docker-compose.yml    # PostgreSQL config
 ```
 
 ## Git Commands
@@ -245,43 +323,24 @@ ollama serve
 # Check status
 git status
 
-# Add all changes
+# Add changes
 git add -A
 
 # Commit
-git commit -m "your message"
+git commit -m "message"
 
-# Push to GitHub
+# Push
 git push origin main
 
 # View history
 git log --oneline
-
-# View changes
-git diff
-```
-
-## Logs
-
-```bash
-# Backend logs
-tail -f backend.log
-
-# Frontend logs
-tail -f frontend.log
-
-# PostgreSQL logs
-docker logs -f ragbot_postgres
-
-# All logs
-tail -f backend.log frontend.log
 ```
 
 ## Performance Tips
 
 1. Use phi model (faster than llama2)
-2. Keep PostgreSQL running (don't restart)
-3. Ingest documents once, query many times
+2. Keep services running (don't restart)
+3. Ingest documents once
 4. Use larger chunks for faster ingestion
 5. Close unused browser tabs
 
@@ -292,14 +351,5 @@ tail -f backend.log frontend.log
 - [ ] Use HTTPS in production
 - [ ] Enable rate limiting
 - [ ] Add email verification
-- [ ] Implement password reset
 - [ ] Regular database backups
-- [ ] Monitor logs for suspicious activity
-
-## Resources
-
-- [FastAPI Docs](https://fastapi.tiangolo.com)
-- [Prisma Docs](https://www.prisma.io/docs)
-- [React Docs](https://react.dev)
-- [Ollama Docs](https://ollama.ai/docs)
-- [PostgreSQL Docs](https://www.postgresql.org/docs)
+- [ ] Monitor logs
