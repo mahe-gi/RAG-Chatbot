@@ -2,7 +2,7 @@
 set -e
 
 echo "=========================================="
-echo "RAG Chatbot v2.0 - Complete Setup"
+echo "RAG Chatbot v2.0 - Setup (No Docker)"
 echo "=========================================="
 echo ""
 
@@ -29,28 +29,17 @@ log_warning() {
     echo -e "${YELLOW}[$(date +'%H:%M:%S')] ⚠${NC} $1"
 }
 
+echo -e "${YELLOW}This setup skips PostgreSQL and uses in-memory authentication${NC}"
+echo -e "${YELLOW}For production use, please use Docker setup with PostgreSQL${NC}"
+echo ""
+read -p "Continue? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+fi
+
 # Check prerequisites
 log "Checking prerequisites..."
-
-# Check Docker
-if ! command -v docker &> /dev/null; then
-    log_error "Docker is not installed"
-    echo "Install from: https://www.docker.com/products/docker-desktop"
-    exit 1
-fi
-
-# Check if Docker daemon is running
-if ! docker info > /dev/null 2>&1; then
-    log_error "Docker Desktop is not running"
-    echo ""
-    echo "Please start Docker Desktop and try again:"
-    echo "  1. Open Docker Desktop application"
-    echo "  2. Wait for it to start (whale icon in menu bar)"
-    echo "  3. Run this script again"
-    echo ""
-    exit 1
-fi
-log_success "Docker found and running"
 
 # Check Ollama
 if ! command -v ollama &> /dev/null; then
@@ -76,24 +65,7 @@ fi
 log_success "Python found ($(python3 --version))"
 
 echo ""
-log "Step 1/6: Starting PostgreSQL..."
-if ! docker-compose up -d postgres 2>&1; then
-    log_error "Failed to start PostgreSQL"
-    echo ""
-    echo "This usually means Docker Desktop is not running."
-    echo "Please:"
-    echo "  1. Open Docker Desktop application"
-    echo "  2. Wait for it to start (whale icon in menu bar)"
-    echo "  3. Run this script again"
-    echo ""
-    echo "See START_DOCKER.md for detailed help"
-    exit 1
-fi
-sleep 5
-log_success "PostgreSQL started"
-
-echo ""
-log "Step 2/6: Setting up backend..."
+log "Step 1/5: Setting up backend..."
 cd backend
 
 if [ ! -d "venv" ]; then
@@ -104,25 +76,25 @@ fi
 source venv/bin/activate
 log "Installing Python dependencies..."
 pip install -q --upgrade pip
-pip install -q -r requirements.txt
+
+# Install without Prisma
+pip install -q fastapi uvicorn langchain langchain-community chromadb pdfplumber python-dotenv python-multipart python-jose[cryptography] passlib bcrypt
+
 log_success "Backend dependencies installed"
 
-log "Setting up database..."
 if [ ! -f .env ]; then
-    cp .env.example .env
-    log_warning "Created .env file - please update SECRET_KEY"
+    cat > .env << 'EOF'
+SECRET_KEY=dev-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+EOF
+    log_success "Created .env file"
 fi
-
-log "Generating Prisma client..."
-prisma generate > /dev/null 2>&1
-log "Pushing database schema..."
-prisma db push > /dev/null 2>&1
-log_success "Database ready"
 
 cd ..
 
 echo ""
-log "Step 3/6: Setting up frontend..."
+log "Step 2/5: Setting up frontend..."
 cd frontend
 if [ ! -d "node_modules" ]; then
     log "Installing frontend dependencies..."
@@ -134,7 +106,7 @@ fi
 cd ..
 
 echo ""
-log "Step 4/6: Checking Ollama..."
+log "Step 3/5: Checking Ollama..."
 if ! pgrep -x "ollama" > /dev/null; then
     log_warning "Ollama is not running"
     log "Please start Ollama in another terminal:"
@@ -151,7 +123,7 @@ fi
 log_success "Phi model ready"
 
 echo ""
-log "Step 5/6: Creating sample documents..."
+log "Step 4/5: Creating sample documents..."
 if [ ! -d "docs" ]; then
     mkdir -p docs
 fi
@@ -181,7 +153,7 @@ EOF
 fi
 
 echo ""
-log "Step 6/6: Ingesting documents..."
+log "Step 5/5: Ingesting documents..."
 cd backend
 source venv/bin/activate
 python3 ingest_fast.py > /dev/null 2>&1
@@ -208,9 +180,6 @@ echo "4. Login with demo account:"
 echo "   Email: demo@ragbot.ai"
 echo "   Password: password"
 echo ""
-echo -e "${CYAN}Services:${NC}"
-echo "  - PostgreSQL: localhost:5432"
-echo "  - Backend API: localhost:8000"
-echo "  - Frontend UI: localhost:5173"
-echo "  - Ollama: localhost:11434"
+echo -e "${YELLOW}Note: Using in-memory authentication (no database)${NC}"
+echo -e "${YELLOW}Users will be reset on server restart${NC}"
 echo ""
